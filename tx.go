@@ -11,8 +11,7 @@ import (
 var zeroHash = common.Hash{}
 
 type CustomTx struct {
-	TxType uint8
-
+	TxType       uint8
 	signedHash   common.Hash
 	unsignedHash common.Hash
 
@@ -42,6 +41,76 @@ type CustomTx struct {
 	AuthList []types.SetCodeAuthorization
 	// helper variable used to indicate where the real information of the tx starts in the rlpbytes slice
 	startPoint uint64
+}
+
+// Measure the length of a tx including the
+func (tx *CustomTx) CalculateRLPBytesLength() (int, error) {
+	switch tx.TxType {
+	case types.DynamicFeeTxType:
+		return tx.calculateRLPBytesLenDynamicFeesTx(), nil
+	case types.LegacyTxType:
+		return tx.calculateRLPBytesLenLegacyTx(), nil
+	default:
+		return 0, ErrTxTypeNotSupported
+	}
+
+}
+
+func (tx *CustomTx) calculateRLPAccessListLength() int {
+	var length int
+	for _, a := range tx.AccessList {
+		length += tx.calculateRLPAccessTupleLength(a)
+	}
+	return CalculateRLPListLength(length)
+}
+
+func (tx *CustomTx) calculateRLPAccessTupleLength(accessTuple types.AccessTuple) int {
+	var length int
+	for range accessTuple.StorageKeys {
+		length += HashRLPLength
+	}
+	length += CalculateRLPListLength(length)
+	length += AddressRLPLength
+	return CalculateRLPListLength(length)
+}
+
+func (tx *CustomTx) calculateRLPBytesLenDynamicFeesTx() int {
+	var length int
+	length += CalculateRLBigIntValueLength(tx.ChainID)
+	length += CalculateRLP64ValueLength(tx.Nonce)
+	length += CalculateRLBigIntValueLength(tx.GasTipCap)
+	length += CalculateRLBigIntValueLength(tx.GasFeeCap)
+	length += CalculateRLP64ValueLength(tx.Gas)
+	if tx.To != nil {
+		length += AddressRLPLength
+	} else {
+		length += 1
+	}
+	length += CalculateRLBigIntValueLength(tx.Value)
+	length += CalculateRLPBytesLength(tx.Data)
+	length += tx.calculateRLPAccessListLength()
+	length += CalculateRLBigIntValueLength(tx.V)
+	length += CalculateRLBigIntValueLength(tx.R)
+	length += CalculateRLBigIntValueLength(tx.S)
+	return CalculateNBytesLength(uint64(CalculateRLPListLength(length) + 1))
+}
+
+func (tx *CustomTx) calculateRLPBytesLenLegacyTx() int {
+	var length int
+	length += CalculateRLP64ValueLength(tx.Nonce)
+	length += CalculateRLBigIntValueLength(tx.GasPrice)
+	length += CalculateRLP64ValueLength(tx.Gas)
+	if tx.To != nil {
+		length += AddressRLPLength
+	} else {
+		length += 1
+	}
+	length += CalculateRLBigIntValueLength(tx.Value)
+	length += CalculateRLPBytesLength(tx.Data)
+	length += CalculateRLBigIntValueLength(tx.V)
+	length += CalculateRLBigIntValueLength(tx.R)
+	length += CalculateRLBigIntValueLength(tx.S)
+	return CalculateRLPListLength(length)
 }
 
 func (tx *CustomTx) CalculateSignedHash() (h common.Hash) {

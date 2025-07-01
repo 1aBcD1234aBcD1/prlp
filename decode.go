@@ -1,11 +1,80 @@
 package prlp
 
 import (
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/holiman/uint256"
+	"io"
 	"math/big"
 )
+
+func DecodeTxsPacket(r *RlpReader) ([]*CustomTx, error) {
+	var txs []*CustomTx
+	// read list length
+	listSize, err := r.ReadListSize()
+	if err != nil {
+		return nil, err
+	}
+	cPos := r.currentPos
+	for r.currentPos-cPos < listSize {
+		if r.IsNextValAList() {
+			tx, err := DecodeLegacyTx(r)
+			if err != nil {
+				return nil, err
+			}
+			txs = append(txs, tx)
+		} else {
+			// get current point so we can store the rlpbytes
+			pos := r.currentPos
+			// we already assume that this is another tx type so we just read how many bytes it has
+			valLength, err := r.ReadValueSize()
+			if err != nil {
+				panic(err)
+			}
+			// check that there are enough bytes to read the tx
+			if !r.EnoughBytes(valLength) {
+				return nil, io.EOF
+			}
+			// starting point just indicates from which byte from the rlp needs to read for the tx hash
+			startPoint := r.currentPos - pos
+
+			rlpBytes := r.bytes[pos : pos+valLength+startPoint]
+			txType, err := r.ReadByte()
+			switch txType {
+			case types.AccessListTxType:
+				{
+					tx, err := DecodeAccessListTx(r, rlpBytes, startPoint)
+					if err != nil {
+						return nil, err
+					}
+					txs = append(txs, tx)
+				}
+			case types.DynamicFeeTxType:
+				{
+					tx, err := DecodeDynamicFeeTx(r, rlpBytes, startPoint)
+					if err != nil {
+						return nil, err
+					}
+					txs = append(txs, tx)
+				}
+			default:
+				// up to this point we have read that it is not a supported tx,
+				// so the next thing to do is read the list length and skip the nbytes
+				txListSize, err := r.ReadListSize()
+				if err != nil {
+					return nil, err
+				}
+				err = r.Skip(txListSize)
+				if err != nil {
+					return nil, err
+				}
+				continue
+			}
+		}
+	}
+	return txs, nil
+}
 
 func DecodeSetCodeAuthorization(r *RlpReader) (setCodeAuthorization types.SetCodeAuthorization, err error) {
 	codeAuthSize, err := r.ReadListSize()
@@ -116,13 +185,15 @@ func DecodeAccessList(r *RlpReader) (accessList types.AccessList, err error) {
 
 // DecodeLegacyTx decodes a legacy transaction from the provided RLP-encoded byte array and returns a CustomTx instance.
 func DecodeLegacyTx(tx *RlpReader) (*CustomTx, error) {
-	rlpBytes := tx.bytes // store the rlpBytes
+	cPos := tx.currentPos // store the rlpBytes
 	// check for slice length
-	_, err := tx.ReadListSize()
+	bytesLength, err := tx.ReadListSize()
 	if err != nil {
 		return nil, err
 	}
-
+	newPos := tx.currentPos - cPos
+	rlpBytes := tx.bytes[cPos : cPos+newPos+bytesLength]
+	fmt.Println(fmt.Sprintf("%x", rlpBytes))
 	nonce, err := tx.DecodeNextValue()
 	if err != nil {
 		return nil, err
