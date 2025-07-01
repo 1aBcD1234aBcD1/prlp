@@ -200,6 +200,10 @@ func (r *RlpReader) DecodeNextValue() ([]byte, error) {
 	return []byte{}, io.EOF
 }
 
+func (r *RlpReader) EnoughBytes(length uint64) bool {
+	return r.Len() >= length
+}
+
 func BytesToUint64(b []byte) uint64 {
 	var buf [8]byte
 
@@ -212,4 +216,8 @@ func BytesToUint64(b []byte) uint64 {
 	}
 
 	return binary.BigEndian.Uint64(buf[:])
+}
+
+func (r *RlpReader) IsNextValAList() bool {
+	return r.bytes[r.currentPos] >= 0xc0
 }
