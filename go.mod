@@ -1,11 +1,10 @@
-module prlp
+module github.com/1aBcD1234aBcD1/prlp
 
 go 1.23.9
 
 require (
 	github.com/ethereum/go-ethereum v1.15.11
 	github.com/holiman/uint256 v1.3.2
-	github.com/status-im/keycard-go v0.2.0
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/crypto v0.35.0
 )

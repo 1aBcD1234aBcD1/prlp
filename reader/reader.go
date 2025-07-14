@@ -2,8 +2,8 @@ package reader
 
 import (
 	"encoding/binary"
+	"github.com/1aBcD1234aBcD1/prlp/errors"
 	"io"
-	"prlp/errors"
 )
 
 type RlpReader struct {

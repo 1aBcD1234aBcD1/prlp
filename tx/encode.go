@@ -2,8 +2,8 @@ package tx
 
 import (
 	"bytes"
+	"github.com/1aBcD1234aBcD1/prlp/errors"
 	"github.com/ethereum/go-ethereum/core/types"
-	"prlp/errors"
 )
 
 func EncodeTxsPacket(buffer *bytes.Buffer, txs []*CustomTx) error {
