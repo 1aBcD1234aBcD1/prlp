@@ -13,7 +13,7 @@ func DecodeTxsPacket(r *reader.RlpReader) ([]*SimpleTx, error) {
 	// read list length
 	listSize, err := r.ReadListSize()
 	if err != nil {
-		return nil, err
+		return txs, err
 	}
 	cPos := r.Pos()
 	for r.Pos()-cPos < listSize {
@@ -23,7 +23,7 @@ func DecodeTxsPacket(r *reader.RlpReader) ([]*SimpleTx, error) {
 			if errors.Is(err, errors.ErrTxTypeNotSupported) {
 				continue
 			}
-			return nil, err
+			return txs, err
 		}
 		txs = append(txs, tx)
 	}

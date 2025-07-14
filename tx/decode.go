@@ -23,7 +23,7 @@ func DecodeTxsPacket(r *reader.RlpReader) ([]*CustomTx, error) {
 		if r.IsNextValAList() {
 			tx, err := DecodeLegacyTx(r)
 			if err != nil {
-				return nil, err
+				return txs, err
 			}
 			txs = append(txs, tx)
 		} else {
@@ -36,7 +36,7 @@ func DecodeTxsPacket(r *reader.RlpReader) ([]*CustomTx, error) {
 			}
 			// check that there are enough bytes to read the tx
 			if !r.EnoughBytes(valLength) {
-				return nil, io.EOF
+				return txs, io.EOF
 			}
 			// starting point just indicates from which byte from the rlp needs to read for the tx hash
 			startPoint := r.Pos() - pos
@@ -48,7 +48,7 @@ func DecodeTxsPacket(r *reader.RlpReader) ([]*CustomTx, error) {
 				{
 					tx, err := DecodeAccessListTx(r, rlpBytes, startPoint)
 					if err != nil {
-						return nil, err
+						return txs, err
 					}
 					txs = append(txs, tx)
 				}
@@ -65,11 +65,11 @@ func DecodeTxsPacket(r *reader.RlpReader) ([]*CustomTx, error) {
 				// so the next thing to do is read the list length and skip the nbytes
 				txListSize, err := r.ReadListSize()
 				if err != nil {
-					return nil, err
+					return txs, err
 				}
 				err = r.Skip(txListSize)
 				if err != nil {
-					return nil, err
+					return txs, err
 				}
 				continue
 			}
