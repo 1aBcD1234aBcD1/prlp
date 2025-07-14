@@ -3,6 +3,7 @@ package simpleTx
 import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"io"
+	"math/big"
 	"prlp/errors"
 	"prlp/reader"
 )
@@ -79,11 +80,17 @@ func DecodeModernTx(r *reader.RlpReader) (*SimpleTx, error) {
 			if err != nil {
 				return nil, err
 			}
+
+			currentPos := r.Pos()
+			chainId, err := r.DecodeNextValue()
+			bytesRead := r.Pos() - currentPos
+
 			return &SimpleTx{
 				TxType:     txType,
 				RLPBytes:   rlpBytes,
+				ChainId:    new(big.Int).SetBytes(chainId),
 				startPoint: startPoint,
-			}, r.Skip(txListSize)
+			}, r.Skip(txListSize - bytesRead)
 		}
 	default:
 		// up to this point we have read that it is not a supported tx,

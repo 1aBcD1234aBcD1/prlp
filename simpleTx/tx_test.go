@@ -56,10 +56,15 @@ func TestDecodeRLPTxsPacket(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
+
 	assert.Equal(t, len(txs), len(simpleTxs))
 	for i, tx := range simpleTxs {
 		assert.Equal(t, tx.RLPBytes, txsBytes[i])
 		assert.Equal(t, hashes[i], tx.Hash(), "pos %d hash mismatch", i)
+		if tx.TxType != types.LegacyTxType {
+			assert.Equal(t, txs[i].ChainId(), tx.ChainId, "pos %d tx chainid mismatch", i)
+			t.Logf("pos %d tx chainid %d", i, tx.ChainId)
+		}
 	}
 
 	assert.Equal(t, uint64(0), r.Len(), "not all data consumed")
