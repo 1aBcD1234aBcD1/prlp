@@ -1,11 +1,11 @@
 package simpleTx
 
 import (
+	"github.com/1aBcD1234aBcD1/prlp/errors"
+	"github.com/1aBcD1234aBcD1/prlp/reader"
 	"github.com/ethereum/go-ethereum/core/types"
 	"io"
 	"math/big"
-	"prlp/errors"
-	"prlp/reader"
 )
 
 func DecodeTxsPacket(r *reader.RlpReader) ([]*SimpleTx, error) {

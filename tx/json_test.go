@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
+	"github.com/1aBcD1234aBcD1/prlp/pool"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -16,7 +17,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"math/big"
 	"os"
-	"prlp/pool"
 	"testing"
 	"time"
 )
@@ -84,7 +84,7 @@ func TestCustomTx_UnmarshalJSON(t *testing.T) {
 }
 
 func TestWS_Sub(t *testing.T) {
-	rpcUrl := os.Getenv("AVAX_RPC_URL")
+	rpcUrl := os.Getenv("BSC_RPC_URL")
 	// Needs a websocket subscription since it test stuff in real time.
 	rpcClient, err := rpc.Dial(rpcUrl)
 	defer rpcClient.Close()

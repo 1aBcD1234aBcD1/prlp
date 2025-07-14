@@ -1,14 +1,16 @@
 package tx
 
 import (
+	"github.com/1aBcD1234aBcD1/prlp/reader"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/holiman/uint256"
 	"io"
 	"math/big"
-	"prlp/reader"
 )
 
+// DecodeTxsPacket decodes a list of transactions from the provided RlpReader and returns them as a slice of CustomTx.
+// Returns an error if decoding fails.
 func DecodeTxsPacket(r *reader.RlpReader) ([]*CustomTx, error) {
 	var txs []*CustomTx
 	// read list length
@@ -76,6 +78,9 @@ func DecodeTxsPacket(r *reader.RlpReader) ([]*CustomTx, error) {
 	return txs, nil
 }
 
+// DecodeSetCodeAuthorization parses an RLP-encoded payload into a SetCodeAuthorization struct.
+// It reads and decodes data such as chain ID, address, nonce, and signature values.
+// Returns the decoded SetCodeAuthorization on success, or an error if decoding fails.
 func DecodeSetCodeAuthorization(r *reader.RlpReader) (setCodeAuthorization types.SetCodeAuthorization, err error) {
 	codeAuthSize, err := r.ReadListSize()
 	if err != nil {
@@ -122,6 +127,9 @@ func DecodeSetCodeAuthorization(r *reader.RlpReader) (setCodeAuthorization types
 	return setCodeAuthorization, err
 }
 
+// DecodeDecodeSetCodeAuthorizationList parses an RLP-encoded payload into a SetCodeAuthorization struct.
+// It reads and decodes data such as chain ID, address, nonce, and signature values.
+// Returns the decoded SetCodeAuthorization on success, or an error if decoding fails.
 func DecodeDecodeSetCodeAuthorizationList(r *reader.RlpReader) (list []types.SetCodeAuthorization, err error) {
 	list = make([]types.SetCodeAuthorization, 0)
 	listSize, err := r.ReadListSize()
@@ -138,6 +146,9 @@ func DecodeDecodeSetCodeAuthorizationList(r *reader.RlpReader) (list []types.Set
 	}
 	return list, err
 }
+
+// DecodeAccessTuple decodes an RLP-encoded access tuple from the provided RlpReader.
+// It returns the decoded access tuple and any error encountered during parsing.
 func DecodeAccessTuple(r *reader.RlpReader) (accessTuple types.AccessTuple, err error) {
 	accessTupleSize, err := r.ReadListSize()
 	if err != nil {

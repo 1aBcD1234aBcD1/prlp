@@ -1,12 +1,12 @@
 package simpleTx
 
 import (
+	reader "github.com/1aBcD1234aBcD1/prlp/reader"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
-	reader "prlp/reader"
 	"testing"
 )
 
