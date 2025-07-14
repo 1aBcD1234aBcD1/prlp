@@ -1,8 +1,9 @@
-package prlp
+package reader
 
 import (
 	"encoding/binary"
 	"io"
+	"prlp/errors"
 )
 
 type RlpReader struct {
@@ -13,6 +14,10 @@ type RlpReader struct {
 
 func (r *RlpReader) Len() uint64 {
 	return r.length - r.currentPos
+}
+
+func (r *RlpReader) BytesLength() uint64 {
+	return r.length
 }
 
 func NewReader(bytes []byte) *RlpReader {
@@ -33,7 +38,7 @@ func (r *RlpReader) ReadValueSize() (uint64, error) {
 			}
 		case c >= 0xC0:
 			{
-				return 0, ErrNotAString
+				return 0, errors.ErrNotAString
 			}
 		case c >= 0xB8:
 			{
@@ -91,7 +96,7 @@ func (r *RlpReader) ReadListSize() (uint64, error) {
 			return size, nil
 		}
 	default:
-		return 0, ErrNotAList
+		return 0, errors.ErrNotAList
 	}
 }
 func (r *RlpReader) ReadByte() (byte, error) {
@@ -206,7 +211,6 @@ func (r *RlpReader) EnoughBytes(length uint64) bool {
 
 func BytesToUint64(b []byte) uint64 {
 	var buf [8]byte
-
 	if len(b) >= 8 {
 		// Use the last 8 bytes
 		copy(buf[:], b[len(b)-8:])
@@ -214,10 +218,17 @@ func BytesToUint64(b []byte) uint64 {
 		// Pad the left side with zeros (big-endian style)
 		copy(buf[8-len(b):], b)
 	}
-
 	return binary.BigEndian.Uint64(buf[:])
 }
 
 func (r *RlpReader) IsNextValAList() bool {
 	return r.bytes[r.currentPos] >= 0xc0
+}
+
+func (r *RlpReader) Pos() uint64 {
+	return r.currentPos
+}
+
+func (r *RlpReader) GetBytes(start, end uint64) []byte {
+	return r.bytes[start:end]
 }

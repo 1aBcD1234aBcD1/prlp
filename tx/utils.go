@@ -1,12 +1,12 @@
-package prlp
+package tx
 
 import (
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"math/big"
 	"math/bits"
+	"prlp/errors"
 )
-
-var AddressRLPLength = 20 + 1
-var HashRLPLength = 32 + 1
 
 // BigIntLength returns the length of a big.Int in bytes
 func BigIntLength(i *big.Int) int {
@@ -34,6 +34,18 @@ func IntLength(n int) int {
 	return (bitLen + 7) / 8               // Round up to full bytes
 }
 
+func IntUnsignedLength(n int) int {
+	if n == 0 {
+		return 1
+	}
+	abs := n
+	if n < 0 {
+		abs = -n
+	}
+	bitLen := bits.Len64(uint64(abs)) // +1 for the sign bit
+	return (bitLen + 7) / 8           // Round up to full bytes
+}
+
 func CalculateRLBigIntValueLength(val *big.Int) int {
 	switch valueLength := BigIntLength(val); {
 	case valueLength == 1 && val.Uint64() <= 0x7f:
@@ -41,7 +53,7 @@ func CalculateRLBigIntValueLength(val *big.Int) int {
 	case valueLength < 56:
 		return 1 + valueLength
 	default:
-		return 1 + IntLength(valueLength) + valueLength
+		return 1 + IntUnsignedLength(valueLength) + valueLength
 	}
 }
 
@@ -81,4 +93,45 @@ func CalculateRLPListLength(listSize int) int {
 	default:
 		return 1 + Uint64Length(uint64(listSize)) + listSize
 	}
+}
+
+func RecoverPlain(sighash common.Hash, R, S, Vb *big.Int, homestead bool) (common.Address, error) {
+	if Vb.BitLen() > 8 {
+		return common.Address{}, errors.ErrInvalidSig
+	}
+	V := byte(Vb.Uint64() - 27)
+	if !crypto.ValidateSignatureValues(V, R, S, homestead) {
+		return common.Address{}, errors.ErrInvalidSig
+	}
+	// encode the signature in uncompressed format
+	r, s := R.Bytes(), S.Bytes()
+	sig := make([]byte, crypto.SignatureLength)
+	copy(sig[32-len(r):32], r)
+	copy(sig[64-len(s):64], s)
+	sig[64] = V
+	// recover the public key from the signature
+	pub, err := crypto.Ecrecover(sighash[:], sig)
+	if err != nil {
+		return common.Address{}, err
+	}
+	if len(pub) == 0 || pub[0] != 4 {
+		return common.Address{}, errors.ErrInvalidPkb
+	}
+	var addr common.Address
+	copy(addr[:], crypto.Keccak256(pub[1:])[12:])
+	return addr, nil
+}
+
+func validateSignatureValues(v byte, r, s *big.Int, homestead bool) bool {
+
+	if r.Cmp(common.Big1) < 0 || s.Cmp(common.Big1) < 0 {
+		return false
+	}
+	// reject upper range of s values (ECDSA malleability)
+	// see discussion in secp256k1/libsecp256k1/include/secp256k1.h
+	if homestead && s.Cmp(secp256k1halfN) > 0 {
+		return false
+	}
+	// Frontier: allow s to be in full N range
+	return r.Cmp(secp256k1N) < 0 && s.Cmp(secp256k1N) < 0 && (v == 0 || v == 1)
 }
