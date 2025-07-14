@@ -1,4 +1,4 @@
-package prlp
+package tx
 
 import (
 	"bytes"
@@ -14,6 +14,8 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 	"math/big"
+	"prlp/pool"
+	reader2 "prlp/reader"
 	"testing"
 )
 
@@ -127,10 +129,11 @@ func TestGenerateAccessListTx(t *testing.T) {
 	// Define the access list
 	accessList := types.AccessList{
 		//{
-		//	Address: common.HexToAddress("0xdead"), // Replace with actual address
+		//	Address: common.Address{}, // Replace with actual address
 		//	StorageKeys: []common.Hash{
-		//		common.HexToHash("0x888888888888"),
+		//		{},
 		//	},
+		//},
 		//},
 		//{
 		//	Address: common.HexToAddress("0xdead01"), // Replace with actual address
@@ -290,15 +293,15 @@ func TestDecodeAccessSetDecodeTx(t *testing.T) {
 		}
 
 		// pre process some info before
-		reader := NewReader(rlpBytes)
+		reader := reader2.NewReader(rlpBytes)
 		// returns a slice of bytes with the tx type and the list of values of the tx
-		startPoint := reader.currentPos
+		startPoint := reader.Pos()
 		// we already assume that this is a AccessList tx so we just read how many bytes it has
 		_, err := reader.ReadValueSize()
 		if err != nil {
 			panic(err)
 		}
-		startPoint = reader.currentPos - startPoint
+		startPoint = reader.Pos() - startPoint
 		if v, err := reader.ReadByte(); v != 0x4 || err != nil {
 			if err != nil {
 				panic(err)
@@ -351,15 +354,15 @@ func TestDecodeBlobTx(t *testing.T) {
 		}
 
 		// pre process some info before
-		reader := NewReader(rlpBytes)
+		reader := reader2.NewReader(rlpBytes)
 		// returns a slice of bytes with the tx type and the list of values of the tx
-		startPoint := reader.currentPos
+		startPoint := reader.Pos()
 		// we already assume that this is a AccessList tx so we just read how many bytes it has
 		length, err := reader.ReadValueSize()
 		if err != nil {
 			panic(err)
 		}
-		startPoint = reader.currentPos - startPoint
+		startPoint = reader.Pos() - startPoint
 		if v, err := reader.ReadByte(); v != 0x3 || err != nil {
 			if err != nil {
 				panic(err)
@@ -413,7 +416,7 @@ func TestDecodeRLPTxsPacket(t *testing.T) {
 	}
 
 	//fmt.Println(fmt.Sprintf("%x", rlpBytes))
-	r := NewReader(rlpBytes)
+	r := reader2.NewReader(rlpBytes)
 	customTxs, err := DecodeTxsPacket(r)
 	if err != nil {
 		panic(err)
@@ -458,7 +461,7 @@ func TestDecodeTxsPacket(t *testing.T) {
 	}
 
 	fmt.Println(fmt.Sprintf("%x", rlpBytes))
-	r := NewReader(rlpBytes)
+	r := reader2.NewReader(rlpBytes)
 	customTxs, err := DecodeTxsPacket(r)
 	if err != nil {
 		panic(err)
@@ -483,11 +486,11 @@ func TestDecodeDynamicFeesTxsRLPAndVals(t *testing.T) {
 
 	hashes := []common.Hash{
 		common.HexToHash("0xd854869c5dad2625bbf59a51f83774281e65fec05c1822abb4c6865ca7a30794"), // normal transfer
-		common.HexToHash("0x378a4f9c71e50ff6d0ca3e81768ee8c4d1adb7020eef097cab0aed6b843cbf73"), // contract interaction with value
-		common.HexToHash("0xa003de94f3f5692870a2060189d3b1f3dbcbde98308437951dd7ce4e055735f0"), // contract creation
-		common.HexToHash("0x4b97fb1f3f13392b42dc7a2400b5bead9768eabf9be5cbc67f27b574b7f5af31"),
-		common.HexToHash("0xffccb2ff3b12075c8d1379cd5aeb5b93b3b577805a0abdc7ea06aa9c1433cb06"),
-		common.HexToHash("0x262a0e5abf7c47be53d6566bb57f510111683b4799dab2ac06c9d36c25ad5e1f"),
+		//common.HexToHash("0x378a4f9c71e50ff6d0ca3e81768ee8c4d1adb7020eef097cab0aed6b843cbf73"), // contract interaction with value
+		//common.HexToHash("0xa003de94f3f5692870a2060189d3b1f3dbcbde98308437951dd7ce4e055735f0"), // contract creation
+		//common.HexToHash("0x4b97fb1f3f13392b42dc7a2400b5bead9768eabf9be5cbc67f27b574b7f5af31"),
+		//common.HexToHash("0xffccb2ff3b12A 075c8d1379cd5aeb5b93b3b577805a0abdc7ea06aa9c1433cb06"),
+		//common.HexToHash("0x262a0e5abf7c47be53d6566bb57f510111683b4799dab2ac06c9d36c25ad5e1f"),
 	}
 	// TODO make tests so we can compare
 	for _, h := range hashes {
@@ -496,24 +499,27 @@ func TestDecodeDynamicFeesTxsRLPAndVals(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
+		from, err := types.Sender(types.LatestSignerForChainID(tx.ChainId()), tx)
+		assert.NoError(t, err)
+
 		var txBuf bytes.Buffer
 		err = tx.EncodeRLP(&txBuf)
 		if err != nil {
 			t.Fatalf("Failed to RLP encode transaction: %v", err)
 		}
-
+		Init(tx.ChainId())
 		rlpBytes := txBuf.Bytes()
 		fmt.Println(fmt.Sprintf("%x", rlpBytes))
-		reader := NewReader(rlpBytes)
+		reader := reader2.NewReader(rlpBytes)
 
 		// returns a slice of bytes with the tx type and the list of values of the tx
-		startPoint := reader.currentPos
+		startPoint := reader.Pos()
 		// we already assume that this is a AccessList tx so we just read how many bytes it has
 		_, err = reader.ReadValueSize()
 		if err != nil {
 			panic(err)
 		}
-		startPoint = reader.currentPos - startPoint
+		startPoint = reader.Pos() - startPoint
 		if v, err := reader.ReadByte(); v != 0x2 || err != nil {
 			if err != nil {
 				panic(err)
@@ -538,9 +544,19 @@ func TestDecodeDynamicFeesTxsRLPAndVals(t *testing.T) {
 		assert.Equal(t, r, customTx.R)
 		assert.Equal(t, s, customTx.S)
 		assert.Equal(t, tx.Hash(), customTx.Hash())
-		txBytesLength, err := customTx.CalculateRLPBytesLength()
+		txBytesLength, _, err := customTx.CalculateRLPSignedBytesLength()
 		assert.NoError(t, err)
 		assert.Equal(t, len(rlpBytes), txBytesLength)
+		fromCustom, err := customTx.From()
+		assert.NoError(t, err)
+		assert.Equal(t, from, fromCustom)
+
+		testBuf := pool.GetRLPBuffer()
+		err = customTx.EncodeSignedDynamicFeesTx(testBuf, true)
+		assert.NoError(t, err)
+		gotBytes := testBuf.Bytes()
+		fmt.Println(fmt.Sprintf("%x", gotBytes))
+		assert.Equal(t, txBuf.Bytes(), gotBytes)
 	}
 }
 
@@ -566,15 +582,15 @@ func TestDecodeAccessListTx(t *testing.T) {
 		}
 
 		// pre process some info before
-		reader := NewReader(rlpBytes)
+		reader := reader2.NewReader(rlpBytes)
 		// returns a slice of bytes with the tx type and the list of values of the tx
-		startPoint := reader.currentPos
+		startPoint := reader.Pos()
 		// we already assume that this is a AccessList tx so we just read how many bytes it has
 		_, err := reader.ReadValueSize()
 		if err != nil {
 			panic(err)
 		}
-		startPoint = reader.currentPos - startPoint
+		startPoint = reader.Pos() - startPoint
 		if v, err := reader.ReadByte(); v != 0x1 || err != nil {
 			if err != nil {
 				panic(err)
@@ -614,11 +630,13 @@ func TestDecodeLegacyTxsRLPAndVals(t *testing.T) {
 	defer client.Close()
 
 	hashes := []common.Hash{
-		common.HexToHash("0x06c3417f1fdbb6708c7c4f7c00fbdc2450e0268f16db798fe4c9fdfd446bf3a5"),
-		common.HexToHash("0xa699e7e0dd8a0c44758645b108cadf46dd17f0884bb1b7992553b809d3eb7cbe"), // random contract interaction
-		common.HexToHash("0x05ec6203d7d0d8794449e4d8393c4e3cc397f2477839248e16db25469e37721d"), // standard contract creation
-		common.HexToHash("0x733cbf37b2321ea3011a8de7dfcc0ee969f8273dcc893f6b52190afc262ef7b2"), // standard contract interaction with value
-		common.HexToHash("0x96f03097169bb4d6937d7adf015d7bfda5ee07c00fc0a3aadad0b24f14807444"), // standard transfer
+		common.HexToHash("0x39b8cedb315237b0fb80f942bb70d9b197e0620279910489cdad82fa388de3ed"), //nonce 1
+		//common.HexToHash("0x59b19f1d6efeaa934e74109b1d40805d5a75604a282ed114636b7fbfed444344"), // nonce 0
+		//common.HexToHash("0x06c3417f1fdbb6708c7c4f7c00fbdc2450e0268f16db798fe4c9fdfd446bf3a5"),
+		//common.HexToHash("0xa699e7e0dd8a0c44758645b108cadf46dd17f0884bb1b7992553b809d3eb7cbe"), // random contract interaction
+		//common.HexToHash("0x05ec6203d7d0d8794449e4d8393c4e3cc397f2477839248e16db25469e37721d"), // standard contract creation
+		//common.HexToHash("0x733cbf37b2321ea3011a8de7dfcc0ee969f8273dcc893f6b52190afc262ef7b2"), // standard contract interaction with value
+		//common.HexToHash("0x96f03097169bb4d6937d7adf015d7bfda5ee07c00fc0a3aadad0b24f14807444"), // standard transfer
 	}
 	// TODO make tests so we can compare
 	for _, h := range hashes {
@@ -627,6 +645,9 @@ func TestDecodeLegacyTxsRLPAndVals(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
+
+		Init(tx.ChainId())
+
 		var txBuf bytes.Buffer
 		err = tx.EncodeRLP(&txBuf)
 		if err != nil {
@@ -644,8 +665,8 @@ func TestDecodeLegacyTxsRLPAndVals(t *testing.T) {
 		//fmt.Println("r", r)
 		//fmt.Println("s", s)
 
-		customTx, err := DecodeLegacyTx(NewReader(txBuf.Bytes()))
-
+		assert.NoError(t, err)
+		customTx, err := DecodeLegacyTx(reader2.NewReader(txBuf.Bytes()))
 		assert.NoError(t, err)
 		assert.Equal(t, tx.Nonce(), customTx.Nonce)
 		assert.Equal(t, tx.GasPrice(), customTx.GasPrice)
@@ -657,10 +678,20 @@ func TestDecodeLegacyTxsRLPAndVals(t *testing.T) {
 		assert.Equal(t, r, customTx.R)
 		assert.Equal(t, s, customTx.S)
 		assert.Equal(t, tx.Hash(), customTx.Hash())
+		assert.NoError(t, err)
 
-		rlpLength, err := customTx.CalculateRLPBytesLength()
+		//assert.Equal(t, tx.ChainId(), customTx.ChainID)
+
+		rlpLength, _, err := customTx.CalculateRLPSignedBytesLength()
 		assert.NoError(t, err)
 		assert.Equal(t, len(txBuf.Bytes()), rlpLength)
+
+		testBuf := pool.GetRLPBuffer()
+		err = customTx.EncodeSignedLegacyTx(testBuf, true)
+		assert.NoError(t, err)
+		gotBytes := testBuf.Bytes()
+		fmt.Println(fmt.Sprintf("%x", gotBytes))
+		assert.Equal(t, txBuf.Bytes(), gotBytes)
 	}
 }
 

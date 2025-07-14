@@ -1,23 +1,23 @@
-package prlp
+package tx
 
 import (
-	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/holiman/uint256"
 	"io"
 	"math/big"
+	"prlp/reader"
 )
 
-func DecodeTxsPacket(r *RlpReader) ([]*CustomTx, error) {
+func DecodeTxsPacket(r *reader.RlpReader) ([]*CustomTx, error) {
 	var txs []*CustomTx
 	// read list length
 	listSize, err := r.ReadListSize()
 	if err != nil {
 		return nil, err
 	}
-	cPos := r.currentPos
-	for r.currentPos-cPos < listSize {
+	cPos := r.Pos()
+	for r.Pos()-cPos < listSize {
 		if r.IsNextValAList() {
 			tx, err := DecodeLegacyTx(r)
 			if err != nil {
@@ -26,7 +26,7 @@ func DecodeTxsPacket(r *RlpReader) ([]*CustomTx, error) {
 			txs = append(txs, tx)
 		} else {
 			// get current point so we can store the rlpbytes
-			pos := r.currentPos
+			pos := r.Pos()
 			// we already assume that this is another tx type so we just read how many bytes it has
 			valLength, err := r.ReadValueSize()
 			if err != nil {
@@ -37,9 +37,9 @@ func DecodeTxsPacket(r *RlpReader) ([]*CustomTx, error) {
 				return nil, io.EOF
 			}
 			// starting point just indicates from which byte from the rlp needs to read for the tx hash
-			startPoint := r.currentPos - pos
+			startPoint := r.Pos() - pos
 
-			rlpBytes := r.bytes[pos : pos+valLength+startPoint]
+			rlpBytes := r.GetBytes(pos, pos+valLength+startPoint)
 			txType, err := r.ReadByte()
 			switch txType {
 			case types.AccessListTxType:
@@ -76,13 +76,13 @@ func DecodeTxsPacket(r *RlpReader) ([]*CustomTx, error) {
 	return txs, nil
 }
 
-func DecodeSetCodeAuthorization(r *RlpReader) (setCodeAuthorization types.SetCodeAuthorization, err error) {
+func DecodeSetCodeAuthorization(r *reader.RlpReader) (setCodeAuthorization types.SetCodeAuthorization, err error) {
 	codeAuthSize, err := r.ReadListSize()
 	if err != nil {
 		return setCodeAuthorization, err
 	}
-	cPos := r.currentPos
-	for r.currentPos-cPos < codeAuthSize {
+	cPos := r.Pos()
+	for r.Pos()-cPos < codeAuthSize {
 		chainId, err := r.DecodeNextValue()
 		if err != nil {
 			return setCodeAuthorization, err
@@ -109,7 +109,7 @@ func DecodeSetCodeAuthorization(r *RlpReader) (setCodeAuthorization types.SetCod
 		}
 		setCodeAuthorization.ChainID = *uint256.MustFromBig(new(big.Int).SetBytes(chainId))
 		setCodeAuthorization.Address = common.BytesToAddress(address)
-		setCodeAuthorization.Nonce = BytesToUint64(nonce)
+		setCodeAuthorization.Nonce = reader.BytesToUint64(nonce)
 		if len(v) == 0 {
 			setCodeAuthorization.V = 0
 		} else {
@@ -122,14 +122,14 @@ func DecodeSetCodeAuthorization(r *RlpReader) (setCodeAuthorization types.SetCod
 	return setCodeAuthorization, err
 }
 
-func DecodeDecodeSetCodeAuthorizationList(r *RlpReader) (list []types.SetCodeAuthorization, err error) {
+func DecodeDecodeSetCodeAuthorizationList(r *reader.RlpReader) (list []types.SetCodeAuthorization, err error) {
 	list = make([]types.SetCodeAuthorization, 0)
 	listSize, err := r.ReadListSize()
 	if err != nil {
 		return list, err
 	}
-	cPos := r.currentPos
-	for r.currentPos-cPos < listSize {
+	cPos := r.Pos()
+	for r.Pos()-cPos < listSize {
 		setCodeAuthroization, err := DecodeSetCodeAuthorization(r)
 		if err != nil {
 			return list, err
@@ -138,13 +138,13 @@ func DecodeDecodeSetCodeAuthorizationList(r *RlpReader) (list []types.SetCodeAut
 	}
 	return list, err
 }
-func DecodeAccessTuple(r *RlpReader) (accessTuple types.AccessTuple, err error) {
+func DecodeAccessTuple(r *reader.RlpReader) (accessTuple types.AccessTuple, err error) {
 	accessTupleSize, err := r.ReadListSize()
 	if err != nil {
 		return accessTuple, err
 	}
-	cPos := r.currentPos
-	for r.currentPos-cPos < accessTupleSize {
+	cPos := r.Pos()
+	for r.Pos()-cPos < accessTupleSize {
 		address, err := r.DecodeNextValue()
 		if err != nil {
 			return accessTuple, err
@@ -154,8 +154,8 @@ func DecodeAccessTuple(r *RlpReader) (accessTuple types.AccessTuple, err error) 
 		if err != nil {
 			return accessTuple, err
 		}
-		cStorageKeysPos := r.currentPos
-		for r.currentPos-cStorageKeysPos < storageKeysSize {
+		cStorageKeysPos := r.Pos()
+		for r.Pos()-cStorageKeysPos < storageKeysSize {
 			storageKey, err := r.DecodeNextValue()
 			if err != nil {
 				return accessTuple, err
@@ -166,14 +166,14 @@ func DecodeAccessTuple(r *RlpReader) (accessTuple types.AccessTuple, err error) 
 	return accessTuple, err
 }
 
-func DecodeAccessList(r *RlpReader) (accessList types.AccessList, err error) {
+func DecodeAccessList(r *reader.RlpReader) (accessList types.AccessList, err error) {
 	accessList = make(types.AccessList, 0)
 	accessListSize, err := r.ReadListSize()
 	if err != nil {
 		return accessList, err
 	}
-	cPos := r.currentPos
-	for r.currentPos-cPos < accessListSize {
+	cPos := r.Pos()
+	for r.Pos()-cPos < accessListSize {
 		accessTuple, err := DecodeAccessTuple(r)
 		if err != nil {
 			return accessList, err
@@ -184,16 +184,24 @@ func DecodeAccessList(r *RlpReader) (accessList types.AccessList, err error) {
 }
 
 // DecodeLegacyTx decodes a legacy transaction from the provided RLP-encoded byte array and returns a CustomTx instance.
-func DecodeLegacyTx(tx *RlpReader) (*CustomTx, error) {
-	cPos := tx.currentPos // store the rlpBytes
+func DecodeLegacyTx(tx *reader.RlpReader) (*CustomTx, error) {
+	// store where does the hashing data for signed hash starts
+	// by legacyTx are at 0
+	// store where does the
+
+	cPos := tx.Pos() // store the rlpBytes
 	// check for slice length
 	bytesLength, err := tx.ReadListSize()
 	if err != nil {
 		return nil, err
 	}
-	newPos := tx.currentPos - cPos
-	rlpBytes := tx.bytes[cPos : cPos+newPos+bytesLength]
-	fmt.Println(fmt.Sprintf("%x", rlpBytes))
+	// store where does the txData starts
+	startTxDataPointer := tx.Pos() - cPos
+	// TODO move this outside the function?
+	rlpBytes := tx.GetBytes(cPos, cPos+startTxDataPointer+bytesLength)
+	rlpBytesLength := len(rlpBytes)
+	rlpBytesTxInfo := rlpBytesLength - int(startTxDataPointer)
+
 	nonce, err := tx.DecodeNextValue()
 	if err != nil {
 		return nil, err
@@ -223,6 +231,7 @@ func DecodeLegacyTx(tx *RlpReader) (*CustomTx, error) {
 	if err != nil {
 		return nil, err
 	}
+	startTxSignature := tx.Pos() - cPos
 	v, err := tx.DecodeNextValue()
 	if err != nil {
 		return nil, err
@@ -236,31 +245,37 @@ func DecodeLegacyTx(tx *RlpReader) (*CustomTx, error) {
 		return nil, err
 	}
 	return &CustomTx{
-		RlpBytes: rlpBytes,
-		Nonce:    BytesToUint64(nonce),
-		GasPrice: new(big.Int).SetBytes(gasPrice),
-		Gas:      BytesToUint64(gas),
-		To:       to,
-		Value:    new(big.Int).SetBytes(value),
-		Data:     data,
-		V:        new(big.Int).SetBytes(v),
-		R:        new(big.Int).SetBytes(r),
-		S:        new(big.Int).SetBytes(s),
+		TxType:               types.LegacyTxType,
+		SignedRlpBytes:       rlpBytes,
+		Nonce:                reader.BytesToUint64(nonce),
+		GasPrice:             new(big.Int).SetBytes(gasPrice),
+		Gas:                  reader.BytesToUint64(gas),
+		To:                   to,
+		Value:                new(big.Int).SetBytes(value),
+		Data:                 data,
+		V:                    new(big.Int).SetBytes(v),
+		R:                    new(big.Int).SetBytes(r),
+		S:                    new(big.Int).SetBytes(s),
+		startTx:              0,
+		startTxDataPointer:   int(startTxDataPointer),
+		startTxSignature:     int(startTxSignature),
+		rlpSignedBytesLength: len(rlpBytes),
+		rlpSignedBytesTxInfo: rlpBytesTxInfo,
 	}, nil
 }
 
 // DecodeAccessListTx decodes an access list transaction from RLP encoded bytes using the provided RlpReader.
 // rlpBytes fields provides all the bytes of the rlp of the tx in the wire.
 // starPoint indicates where the tx info starts in the rlpBytes slice. Needed to calculate the hash
-func DecodeAccessListTx(tx *RlpReader, rlpBytes []byte, startPoint uint64) (*CustomTx, error) {
-
-	//rlpBytes := rlpBytes // store the rlpBytes
-	// check for slice length
+func DecodeAccessListTx(tx *reader.RlpReader, rlpBytes []byte, startPoint uint64) (*CustomTx, error) {
+	// start point will always be txvalsize info - txType, where the position of txType is startPoint.
+	cPos := tx.Pos() - startPoint - 1 // after the startpoint we read one byte, thats why the - 1
 	_, err := tx.ReadListSize()
 	if err != nil {
 		return nil, err
 	}
-
+	startTxDataPointer := tx.Pos() - cPos
+	rlpBytesLength := len(rlpBytes)
 	chainId, err := tx.DecodeNextValue()
 	if err != nil {
 		return nil, err
@@ -299,6 +314,7 @@ func DecodeAccessListTx(tx *RlpReader, rlpBytes []byte, startPoint uint64) (*Cus
 	if err != nil {
 		return nil, err
 	}
+	startTxSignature := tx.Pos() - cPos
 	v, err := tx.DecodeNextValue()
 	if err != nil {
 		return nil, err
@@ -312,33 +328,39 @@ func DecodeAccessListTx(tx *RlpReader, rlpBytes []byte, startPoint uint64) (*Cus
 		return nil, err
 	}
 	return &CustomTx{
-		TxType:     types.AccessListTxType,
-		RlpBytes:   rlpBytes,
-		ChainID:    new(big.Int).SetBytes(chainId),
-		Nonce:      BytesToUint64(nonce),
-		GasPrice:   new(big.Int).SetBytes(gasPrice),
-		Gas:        BytesToUint64(gas),
-		To:         to,
-		Value:      new(big.Int).SetBytes(value),
-		Data:       data,
-		V:          new(big.Int).SetBytes(v),
-		R:          new(big.Int).SetBytes(r),
-		S:          new(big.Int).SetBytes(s),
-		AccessList: accessList,
-		startPoint: startPoint,
+		TxType:               types.AccessListTxType,
+		SignedRlpBytes:       rlpBytes,
+		ChainID:              new(big.Int).SetBytes(chainId),
+		Nonce:                reader.BytesToUint64(nonce),
+		GasPrice:             new(big.Int).SetBytes(gasPrice),
+		Gas:                  reader.BytesToUint64(gas),
+		To:                   to,
+		Value:                new(big.Int).SetBytes(value),
+		Data:                 data,
+		V:                    new(big.Int).SetBytes(v),
+		R:                    new(big.Int).SetBytes(r),
+		S:                    new(big.Int).SetBytes(s),
+		AccessList:           accessList,
+		rlpSignedBytesLength: rlpBytesLength,
+		rlpSignedBytesTxInfo: rlpBytesLength - int(startTxDataPointer),
+		startTx:              int(startPoint),
+		startTxDataPointer:   int(startTxDataPointer),
+		startTxSignature:     int(startTxSignature),
 	}, nil
 }
 
-// DecodeDynamicFeeTx decodes an dynamic fee transaction from RLP encoded bytes using the provided RlpReader.
+// DecodeDynamicFeeTx decodes a dynamic fee transaction from RLP encoded bytes using the provided RlpReader.
 // rlpBytes fields provides all the bytes of the rlp of the tx in the wire.
 // starPoint indicates where the tx info starts in the rlpBytes slice. Needed to calculate the hash
-func DecodeDynamicFeeTx(tx *RlpReader, rlpBytes []byte, startPoint uint64) (*CustomTx, error) {
-
+func DecodeDynamicFeeTx(tx *reader.RlpReader, rlpBytes []byte, startPoint uint64) (*CustomTx, error) {
+	// start point will always be txvalsize info - txType, where the position of txType is startPoint.
+	cPos := tx.Pos() - startPoint - 1 // after the startpoint we read one byte, thats why the - 1
 	_, err := tx.ReadListSize()
 	if err != nil {
 		return nil, err
 	}
-
+	startTxDataPointer := tx.Pos() - cPos
+	rlpBytesLength := len(rlpBytes)
 	chainId, err := tx.DecodeNextValue()
 	if err != nil {
 		return nil, err
@@ -381,6 +403,7 @@ func DecodeDynamicFeeTx(tx *RlpReader, rlpBytes []byte, startPoint uint64) (*Cus
 	if err != nil {
 		return nil, err
 	}
+	startTxSignature := tx.Pos() - cPos
 	v, err := tx.DecodeNextValue()
 	if err != nil {
 		return nil, err
@@ -394,34 +417,40 @@ func DecodeDynamicFeeTx(tx *RlpReader, rlpBytes []byte, startPoint uint64) (*Cus
 		return nil, err
 	}
 	return &CustomTx{
-		TxType:     types.DynamicFeeTxType,
-		RlpBytes:   rlpBytes,
-		ChainID:    new(big.Int).SetBytes(chainId),
-		Nonce:      BytesToUint64(nonce),
-		GasTipCap:  new(big.Int).SetBytes(gasTipCap),
-		GasFeeCap:  new(big.Int).SetBytes(gasFeeCap),
-		Gas:        BytesToUint64(gas),
-		To:         to,
-		Value:      new(big.Int).SetBytes(value),
-		Data:       data,
-		V:          new(big.Int).SetBytes(v),
-		R:          new(big.Int).SetBytes(r),
-		S:          new(big.Int).SetBytes(s),
-		AccessList: accessList,
-		startPoint: startPoint,
+		TxType:               types.DynamicFeeTxType,
+		SignedRlpBytes:       rlpBytes,
+		ChainID:              new(big.Int).SetBytes(chainId),
+		Nonce:                reader.BytesToUint64(nonce),
+		GasTipCap:            new(big.Int).SetBytes(gasTipCap),
+		GasFeeCap:            new(big.Int).SetBytes(gasFeeCap),
+		Gas:                  reader.BytesToUint64(gas),
+		To:                   to,
+		Value:                new(big.Int).SetBytes(value),
+		Data:                 data,
+		V:                    new(big.Int).SetBytes(v),
+		R:                    new(big.Int).SetBytes(r),
+		S:                    new(big.Int).SetBytes(s),
+		AccessList:           accessList,
+		rlpSignedBytesLength: rlpBytesLength,
+		rlpSignedBytesTxInfo: rlpBytesLength - int(startTxDataPointer),
+		startTx:              int(startPoint),
+		startTxDataPointer:   int(startTxDataPointer),
+		startTxSignature:     int(startTxSignature),
 	}, nil
 }
 
 // DecodeDynamicFeeTx decodes an dynamic fee transaction from RLP encoded bytes using the provided RlpReader.
 // rlpBytes fields provides all the bytes of the rlp of the tx in the wire.
 // starPoint indicates where the tx info starts in the rlpBytes slice. Needed to calculate the hash
-func DecodeSetCodeTx(tx *RlpReader, rlpBytes []byte, startPoint uint64) (*CustomTx, error) {
-
+func DecodeSetCodeTx(tx *reader.RlpReader, rlpBytes []byte, startPoint uint64) (*CustomTx, error) {
+	// start point will always be txvalsize info - txType, where the position of txType is startPoint.
+	cPos := tx.Pos() - startPoint - 1 // after the startpoint we read one byte, thats why the - 1
 	_, err := tx.ReadListSize()
 	if err != nil {
 		return nil, err
 	}
-
+	startTxDataPointer := tx.Pos() - cPos
+	rlpBytesLength := len(rlpBytes)
 	chainId, err := tx.DecodeNextValue()
 	if err != nil {
 		return nil, err
@@ -469,6 +498,7 @@ func DecodeSetCodeTx(tx *RlpReader, rlpBytes []byte, startPoint uint64) (*Custom
 	if err != nil {
 		return nil, err
 	}
+	startTxSignature := tx.Pos() - cPos
 	v, err := tx.DecodeNextValue()
 	if err != nil {
 		return nil, err
@@ -482,21 +512,25 @@ func DecodeSetCodeTx(tx *RlpReader, rlpBytes []byte, startPoint uint64) (*Custom
 		return nil, err
 	}
 	return &CustomTx{
-		TxType:     types.SetCodeTxType,
-		RlpBytes:   rlpBytes,
-		ChainID:    new(big.Int).SetBytes(chainId),
-		Nonce:      BytesToUint64(nonce),
-		GasTipCap:  new(big.Int).SetBytes(gasTipCap),
-		GasFeeCap:  new(big.Int).SetBytes(gasFeeCap),
-		Gas:        BytesToUint64(gas),
-		To:         to,
-		Value:      new(big.Int).SetBytes(value),
-		Data:       data,
-		V:          new(big.Int).SetBytes(v),
-		R:          new(big.Int).SetBytes(r),
-		S:          new(big.Int).SetBytes(s),
-		AccessList: accessList,
-		AuthList:   authList,
-		startPoint: startPoint,
+		TxType:               types.SetCodeTxType,
+		SignedRlpBytes:       rlpBytes,
+		ChainID:              new(big.Int).SetBytes(chainId),
+		Nonce:                reader.BytesToUint64(nonce),
+		GasTipCap:            new(big.Int).SetBytes(gasTipCap),
+		GasFeeCap:            new(big.Int).SetBytes(gasFeeCap),
+		Gas:                  reader.BytesToUint64(gas),
+		To:                   to,
+		Value:                new(big.Int).SetBytes(value),
+		Data:                 data,
+		V:                    new(big.Int).SetBytes(v),
+		R:                    new(big.Int).SetBytes(r),
+		S:                    new(big.Int).SetBytes(s),
+		AccessList:           accessList,
+		AuthList:             authList,
+		rlpSignedBytesLength: rlpBytesLength,
+		rlpSignedBytesTxInfo: rlpBytesLength - int(startTxDataPointer),
+		startTx:              int(startPoint),
+		startTxDataPointer:   int(startTxDataPointer),
+		startTxSignature:     int(startTxSignature),
 	}, nil
 }
