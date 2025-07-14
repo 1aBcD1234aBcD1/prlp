@@ -9,6 +9,21 @@ import (
 	"math/big"
 )
 
+// DecodePoolTxsPacket decodes a list of transactions from the provided RlpReader and returns them as a slice of CustomTx.
+// Returns an error if decoding fails.
+func DecodePoolTxsPacket(r *reader.RlpReader) ([]*CustomTx, error) {
+	// read list length
+	_, err := r.ReadListSize()
+	if err != nil {
+		return []*CustomTx{}, err
+	}
+	_, err = r.DecodeUint64()
+	if err != nil {
+		return []*CustomTx{}, err
+	}
+	return DecodeTxsPacket(r)
+}
+
 // DecodeTxsPacket decodes a list of transactions from the provided RlpReader and returns them as a slice of CustomTx.
 // Returns an error if decoding fails.
 func DecodeTxsPacket(r *reader.RlpReader) ([]*CustomTx, error) {

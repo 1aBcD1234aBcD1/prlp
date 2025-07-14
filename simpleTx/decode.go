@@ -8,6 +8,19 @@ import (
 	"math/big"
 )
 
+func DecodePoolTxsPacket(r *reader.RlpReader) ([]*SimpleTx, error) {
+	// read list length
+	_, err := r.ReadListSize()
+	if err != nil {
+		return []*SimpleTx{}, err
+	}
+	_, err = r.DecodeUint64()
+	if err != nil {
+		return []*SimpleTx{}, err
+	}
+	return DecodeTxsPacket(r)
+}
+
 func DecodeTxsPacket(r *reader.RlpReader) ([]*SimpleTx, error) {
 	var txs []*SimpleTx
 	// read list length
