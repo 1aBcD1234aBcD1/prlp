@@ -1,4 +1,4 @@
-package tx
+package genTx
 
 import (
 	"github.com/1aBcD1234aBcD1/prlp/reader"
